@@ -5,12 +5,14 @@
 """
 import json
 import os
+import time
 from abc import ABC, abstractmethod
 from typing import TypeVar, Optional, Any, Dict
 import logging
 
 from knowledge.processor.import_processor.config import ImportConfig, get_config
 from knowledge.processor.import_processor.exceptions import ImportProcessError
+from knowledge.utils.task_utils import add_running_task, add_done_task, add_node_duration
 
 T = TypeVar("T")  # 泛型状态类型
 
@@ -63,15 +65,25 @@ class BaseNode(ABC):
         Raises:
             ImportProcessError: 节点执行失败时抛出
         """
+        task_id = state.get("task_id","")
         try:
             # 1. 开始准备执行节点
             self.logger.info(f"--- {self.name} 开始 ---")
 
             # 2. 执行节点
+            if task_id:
+                add_running_task(task_id,self.name)
+            start_time = time.time()
+
             result = self.process(state)
 
             # 3. 执行节点成功
             self.logger.info(f"--- {self.name} 完成 ---")
+
+            end_time = time.time()
+            if task_id:
+                add_done_task(task_id,self.name)
+                add_node_duration(task_id,self.name,end_time-start_time)
 
             return result
         except Exception as e:
