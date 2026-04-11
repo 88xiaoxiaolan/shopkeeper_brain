@@ -396,12 +396,12 @@ class ItemNameConfirmedNode(BaseNode):
             confirmed,options = [],[]
 
         # 5、决策
-        self._decide(confirmed,options,state,rewritten_query,item_names)
+        self._decide(confirmed,options,state,rewritten_query)
 
         self.logger.info(f"确认商品名列表：{confirmed}，候选商品列表：{options}")
-        return llm_result
+        return state
 
-    def _decide(self, confirmed:List[str], options:List[str], state:QueryGraphState, rewritten_query:str, item_names:List[str]):
+    def _decide(self, confirmed:List[str], options:List[str], state:QueryGraphState, rewritten_query:str):
         """
         根据confirmed、options 来判断继续检索还是继续返回用户的信息
         Args:
@@ -409,12 +409,11 @@ class ItemNameConfirmedNode(BaseNode):
             options: 候选的商品列表
             state: 查询状态
             rewritten_query: 问题重写
-            item_names: 商品名
         Returns:
         """
 
         if confirmed:
-            state["item_names"] = item_names
+            state["item_names"] = confirmed
             state["rewritten_query"] = rewritten_query
         elif options:
             state["answer"] = (

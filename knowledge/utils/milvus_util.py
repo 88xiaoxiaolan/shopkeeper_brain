@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from typing import Optional, List
+from typing import Optional, List, Tuple, Dict, Any
 from pymilvus import MilvusClient, WeightedRanker, AnnSearchRequest
 
 milvus_client: Optional[MilvusClient] = None
@@ -22,6 +22,7 @@ def create_hybrid_search_requests(dense_vector,
                                   dense_params=None,
                                   sparse_params=None,
                                   expr=None,
+                                  expr_params=None,
                                   limit=5) -> List[AnnSearchRequest]:
     """
     创建混合搜索请求
@@ -31,6 +32,7 @@ def create_hybrid_search_requests(dense_vector,
     :param dense_params: 稠密向量搜索参数，默认为None
     :param sparse_params: 稀疏向量搜索参数，默认为None
     :param expr: 查询表达式，默认为None
+    :param expr_params: 变量内容，默认为None
     :param limit: 返回结果数量限制，默认为5
     :return: 包含稠密和稀疏搜索请求的列表
     :raises ValueError: 向量参数无效
@@ -52,6 +54,7 @@ def create_hybrid_search_requests(dense_vector,
             anns_field="dense_vector",
             param=dense_params,
             expr=expr, # 过滤条件，表达式写法
+            expr_params=expr_params,
             limit=limit
         )
 
@@ -61,10 +64,11 @@ def create_hybrid_search_requests(dense_vector,
             anns_field="sparse_vector",
             param=sparse_params,
             expr=expr,
+            expr_params=expr_params,
             limit=limit
         )
 
-        return [dense_req, sparse_req]
+        return [dense_req, sparse_req]  #这里决定了权重的顺序
     except Exception as e:
         raise RuntimeError(f"创建混合搜索请求失败: {e}") from e
 
@@ -124,3 +128,9 @@ def execute_hybrid_search_query(milvus_client: MilvusClient,
         return res
     except Exception as e:
         raise RuntimeError(f"执行Milvus混合搜索失败 (collection={collection_name}): {e}") from e
+
+# 根据item_name 来过滤
+def _item_name_search(item_names:List[str]) -> Tuple[str,Dict[str,Any]]:
+    expr = "item_name in {item_names}"
+    expr_params = {"item_names":item_names}
+    return expr,expr_params
