@@ -6,6 +6,7 @@ from langchain_openai import ChatOpenAI
 from openai import OpenAI
 from dotenv import load_dotenv
 from pymilvus.model.hybrid import BGEM3EmbeddingFunction
+from FlagEmbedding import FlagReranker
 
 from knowledge.utils.client.base import BaseClientManager, logger
 
@@ -24,6 +25,9 @@ class AIClients(BaseClientManager):
 
     _bge_m3_client: Optional[BGEM3EmbeddingFunction] = None
     _bge_m3_lock = threading.Lock()
+
+    _bge_m3_reranker_client: Optional[FlagReranker] = None
+    _bge_m3_reranker_lock = threading.Lock()
 
     # ── LLM
     @classmethod
@@ -83,7 +87,7 @@ class AIClients(BaseClientManager):
             logger.error(f"ChatOpenAI 客户端创建失败: {e}")
             raise ConnectionError(f"ChatOpenAI 连接失败: {e}") from e
 
-    # bge-m3
+    # bge-m3  嵌入模型
     @classmethod
     def get_bge_m3_client(cls) -> BGEM3EmbeddingFunction:
         return cls._get_or_create("_bge_m3_client", cls._bge_m3_lock,cls._create_bge_m3_client)
@@ -111,6 +115,35 @@ class AIClients(BaseClientManager):
         except Exception as e:
             logger.error(f"bge_m3 客户端创建失败: {e}")
             raise ConnectionError(f"bge_m3 连接失败: {e}") from e
+
+    # bge-m3-reranker 模型
+    @classmethod
+    def get_bge_m3_reranker_client(cls) -> BGEM3EmbeddingFunction:
+        return cls._get_or_create("_bge_m3_reranker_client", cls._bge_m3_reranker_lock, cls._create_bge_m3_reranker_client)
+
+    @classmethod
+    def _create_bge_m3_reranker_client(cls) -> BGEM3EmbeddingFunction:
+        try:
+            model_name = cls._require_env("BGE_RERANKER_LARGE")
+            device = cls._require_env("BGE_DEVICE")
+            use_fp16 = cls._require_env("BGE_FP16")
+
+            fp16 = True if use_fp16.lower() in ("true", "1") else False
+
+            reranker = FlagReranker(
+                model_name_or_path=model_name,  # Specify the model name
+                device=device,  # Specify the device to use, e.g., 'cpu' or 'cuda:0'
+                use_fp16=fp16  # Specify whether to use fp16. Set to `False` if `device` is `cpu`.
+            )
+
+            logger.info(f"bge_m3_reranker 客户端初始化成功")
+            return reranker
+
+        except EnvironmentError:
+            raise
+        except Exception as e:
+            logger.error(f"bge_m3_reranker 客户端创建失败: {e}")
+            raise ConnectionError(f"bge_m3_reranker 连接失败: {e}") from e
 
 if __name__ == "__main__":
     import json

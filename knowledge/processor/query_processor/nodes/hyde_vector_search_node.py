@@ -65,7 +65,7 @@ class HydeVectorSearchNode(BaseNode):
                 ranker_weights=(0.5, 0.5),
                 norm_score=True,
                 limit=5,
-                output_fields=["chunk_id", "content", "item_name"],
+                output_fields=["chunk_id", "content", "item_name","title"],
             )
 
             # 判断是否有结果
