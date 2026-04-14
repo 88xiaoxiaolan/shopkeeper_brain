@@ -1,4 +1,4 @@
-from typing import Tuple, List, Optional
+from typing import Tuple, List, Optional, Union, Dict, Any
 from langchain_core.messages import SystemMessage, HumanMessage
 from knowledge.processor.query_processor.exceptions import StateFieldError
 from knowledge.processor.query_processor.base import BaseNode, T
@@ -13,7 +13,7 @@ from knowledge.utils.milvus_util import _item_name_search, create_hybrid_search_
 class HydeVectorSearchNode(BaseNode):
     name = "hyde_vector_search_node"
 
-    def process(self, state: QueryGraphState) -> QueryGraphState:
+    def process(self, state: QueryGraphState) -> Union[QueryGraphState, Dict[str, Any]]:
         # 1、参数校验
         rewritten_query, item_names = self._validate(state)
 
@@ -22,28 +22,28 @@ class HydeVectorSearchNode(BaseNode):
 
         # 3、判断
         if hy_document is None:
-            return state
+            return {}
 
         # 4、获取嵌入模型
         try:
             bge_m3_client = AIClients.get_bge_m3_client()
         except ConnectionError as e:
             self.logger.error(f"嵌入模型获取失败，{str(e)}")
-            return state
+            return {}
 
         # 5、获取milvus客户端
         try:
             milvus_client = StorageClients.get_milvus_client()
         except ConnectionError as e:
             self.logger.error(f"嵌入milvus客户端获取失败，{str(e)}")
-            return state
+            return {}
 
         # 6、为假设性文档生成嵌入向量
         try:
             hy_document_vector = generate_bge_m3_hybrid_vectors(bge_m3_client, [f"{rewritten_query}\n{hy_document}"])
         except Exception as e:
             self.logger.error(f"获取查询的嵌入向量失败，{str(e)}")
-            return state
+            return {}
 
         # 7、创建search请求，做混合检索
         try:
@@ -71,15 +71,17 @@ class HydeVectorSearchNode(BaseNode):
             # 判断是否有结果
             if not hybrid_search_result or not hybrid_search_result[0]:
                 self.logger.info("混合搜索结果为空")
-                return state
+                return {}
             else:
                 # 更新state
-                state["hyde_embedding_chunks"] = hybrid_search_result[0]
-                return state
+                # state["hyde_embedding_chunks"] = hybrid_search_result[0]
+                # return state
+                # 由于是并行搜索，如果直接返回state，langgraph会认为多个节点在同一个时间对state中的同一个数据做了更改，此时会报错，所以这里直接返回修改的字段既可，内部会更新到state中，以供其他节点使用的
+                return {"hyde_embedding_chunks": hybrid_search_result[0]}
 
         except Exception as e:
             self.logger.error(f"原始问题{rewritten_query}搜索结果失败，{str(e)}")
-            return state
+            return {}
 
     def _validate(self, state: QueryGraphState) -> Tuple[str,List]:
         rewritten_query = state.get("rewritten_query")

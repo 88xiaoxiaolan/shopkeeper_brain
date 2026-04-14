@@ -14,6 +14,7 @@ from knowledge.utils.client.ai_clients import AIClients
 from knowledge.utils.client.storage_clients import StorageClients
 from knowledge.utils.embedding_util import generate_bge_m3_hybrid_vectors
 from knowledge.utils.milvus_util import create_hybrid_search_requests, execute_hybrid_search_query
+from knowledge.utils.mongo_history_util import get_recent_messages
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -378,12 +379,24 @@ class ItemNameConfirmedNode(BaseNode):
         # 1、获取用户的原始问题
         original_query = state.get("original_query")
 
-        # 2、获取历史对话（mongodb）todo
-        history_context = ""
+        # 2、获取历史对话（mongodb）
+        session_id = state.get("session_id")
+        # limit=10, 条数是10条，但是只有5轮，一轮有query 和 answer 两条数据
+        history_context = get_recent_messages(session_id=session_id,limit=10)
+        formatted_history = []
+        for h in history_context:
+            role = h.get("role")
+            text = h.get("text")
+            content = f"角色:{role},内容:{text}"
+            formatted_history.append(content)
+        formatted_history_str = " ".join(formatted_history)
+
+        # 直接从mondb中获取的历史对话
+        state["history"] = history_context
 
         # 3、利用llm进行商品名提取和查询重写
         # {'item_names': ['RS-12 数字万用表'], 'rewritten_query': 'RS-12 数字万用表的使用方法是什么？'}
-        llm_result: Dict[str:Any] = self._extractor.extract_item_name(original_query, history_context)
+        llm_result: Dict[str:Any] = self._extractor.extract_item_name(original_query, formatted_history_str)
 
         # 3.1、获取llm的结果
         item_names = llm_result.get("item_names")

@@ -2,6 +2,9 @@ import threading
 from typing import Optional
 from typing import TypeVar, Optional
 import logging
+
+from pymongo import MongoClient
+
 logger = logging.getLogger(__name__)
 
 
@@ -21,6 +24,9 @@ class StorageClients(BaseClientManager):
 
     _milvus_client: Optional[MilvusClient] = None
     _milvus_lock = threading.Lock()
+
+    _mongodb_client: Optional[MilvusClient] = None
+    _mongodb_lock = threading.Lock()
 
     # ── MinIO ──
     @classmethod
@@ -71,3 +77,27 @@ class StorageClients(BaseClientManager):
         except Exception as e:
             logger.error(f"Milvus 客户端创建失败: {e}")
             raise ConnectionError(f"Milvus 连接失败: {e}") from e
+
+    # ── Mongodb ──
+    @classmethod
+    def get_mongo_db(cls) -> MilvusClient:
+        return cls._get_or_create("_mongodb_client", cls._mongodb_lock, cls._create_mongo_db)
+
+    @classmethod
+    def _create_mongo_db(cls) -> MilvusClient:
+        try:
+            mongo_url = cls._require_env("MONGO_URL")
+            db_name = cls._require_env("MONGO_DB_NAME")
+
+            mongo_client = MongoClient(mongo_url)
+            db = mongo_client[db_name]
+
+            logger.info(f"MongoDB 创建成功,db:{db_name}")
+            return db
+
+        except EnvironmentError:
+            raise
+        except Exception as e:
+            logger.error(f"MongoDB 客户端创建失败: {e}")
+            raise ConnectionError(f"MongoDB 连接失败: {e}") from e
+

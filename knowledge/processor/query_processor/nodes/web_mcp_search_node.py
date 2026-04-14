@@ -1,7 +1,7 @@
 import asyncio
 import json
 from json import JSONDecodeError
-from typing import Tuple, List, Dict, Any, Optional
+from typing import Tuple, List, Dict, Any, Optional, Union
 from agents.mcp import MCPServerStreamableHttp
 from knowledge.processor.query_processor.base import BaseNode
 from knowledge.processor.query_processor.exceptions import StateFieldError
@@ -11,7 +11,7 @@ from knowledge.processor.query_processor.state import QueryGraphState
 class WebMcpSearchNode(BaseNode):
     name = "web_mcp_search_node"
 
-    def process(self, state: QueryGraphState) -> QueryGraphState:
+    def process(self, state: QueryGraphState) -> Union[QueryGraphState, Dict[str, Any]]:
         # 1、参数校验
         rewritten_query, item_names = self._validate(state)
 
@@ -20,10 +20,11 @@ class WebMcpSearchNode(BaseNode):
         web_search_result = asyncio.run(self._execute_map_server(rewritten_query))
 
         if not web_search_result:
-            return state
+            return {}
 
-        state["web_search_docs"] = web_search_result
-        return state
+        # 由于是并行搜索，如果直接返回state，langgraph会认为多个节点在同一个时间对state中的同一个数据做了更改，此时会报错，所以这里直接返回修改的字段既可，内部会更新到state中，以供其他节点使用的
+        # 如果是没有更新，直接返回{}
+        return {"web_search_docs": web_search_result}
 
     def _validate(self, state: QueryGraphState) -> Tuple[str, List]:
         rewritten_query = state.get("rewritten_query")
