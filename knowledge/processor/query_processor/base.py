@@ -7,6 +7,9 @@ from typing import TypeVar, Optional
 import logging
 from knowledge.processor.query_processor.config import QueryConfig, get_config
 from knowledge.processor.query_processor.exceptions import QueryProcessError
+from knowledge.utils.sse_util import push_sse_event, SSEEvent
+from knowledge.utils.task_utils import add_running_task, get_task_status, get_running_task_list, get_done_task_list, \
+    add_done_task
 
 T = TypeVar("T")  # 泛型状态类型
 
@@ -61,10 +64,28 @@ class BaseNode(ABC):
         Raises:
             QueryProcessError: 节点执行失败时抛出。
         """
+
+        task_id = state.get("task_id")
+        is_stream = state.get("is_stream")
+
         try:
             self.logger.info(f"--- {self.name} 开始 ---")
 
+            # 节点开始做
+            if task_id:
+                add_running_task(task_id=task_id, node_name=self.name)
+                if is_stream:
+                    self._push_progress(task_id)
+
             result = self.process(state)
+
+
+            # 节点完成
+            if task_id:
+                add_done_task(task_id=task_id, node_name=self.name)
+                if is_stream:
+                    self._push_progress(task_id)
+
             self.logger.info(f"--- {self.name} 完成 ---")
             return result
         except Exception as e:
@@ -101,6 +122,16 @@ class BaseNode(ABC):
         if message:
             log_msg += f" {message}"
         self.logger.info(log_msg)
+
+    def _push_progress(self, task_id:str):
+        # 全量推所有的节点进度
+        push_sse_event(task_id=task_id,
+                       event=SSEEvent.PROGRESS,
+                       data={
+                           "status": get_task_status(task_id),
+                           "done_list": get_done_task_list(task_id),
+                           "running_list": get_running_task_list(task_id)
+                       })
 
 
 def setup_logging(level: int = logging.INFO):

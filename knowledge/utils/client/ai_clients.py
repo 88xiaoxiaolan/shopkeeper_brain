@@ -57,41 +57,14 @@ class AIClients(BaseClientManager):
     @classmethod
     def get_llm_client(cls,response_format:bool=True) -> ChatOpenAI:
         if response_format:
-            return cls._get_or_create("_openai_llm_response_json_client", cls._openai_llm_response_json_lock, lambda: cls._create_llm_json_client(response_format))
+            return cls._get_or_create("_openai_llm_response_json_client", cls._openai_llm_response_json_lock, lambda: cls._create_llm_client(response_format))
         else:
             # lambda 它也不会立马执行，返回的还是一个函数，在父类中factory执行的时候，才会执行, 使用lambda，只是为了传参
-            return cls._get_or_create("_openai_llm_response_text_client", cls._openai_llm_response_text_lock, cls._create_llm_client)
+            return cls._get_or_create("_openai_llm_response_text_client", cls._openai_llm_response_text_lock, lambda: cls._create_llm_client(response_format))
 
-    # LLM - text
+    # LLM
     @classmethod
-    def _create_llm_client(cls) -> ChatOpenAI:
-        try:
-            api_key = cls._require_env("OPENAI_API_KEY")
-            base_url = cls._require_env("OPENAI_API_BASE")
-            model_name = cls._require_env("LLM_DEFAULT_MODEL")
-
-            llm_client = ChatOpenAI(
-                model_name=model_name,
-                temperature=0,
-                # openai_api_key=api_key,
-                # openai_api_base=base_url,
-                api_key=api_key,
-                base_url=base_url,
-                # 加了这个，此时响应的格式，是纯真的json格式，不是代码块的json格式
-            )
-
-            logger.info(f"ChatOpenAI 客户端初始化成功 (base_url={base_url})")
-            return llm_client
-
-        except EnvironmentError:
-            raise
-        except Exception as e:
-            logger.error(f"ChatOpenAI 客户端创建失败: {e}")
-            raise ConnectionError(f"ChatOpenAI 连接失败: {e}") from e
-
-    # LLM - json
-    @classmethod
-    def _create_llm_json_client(cls, response_format) -> ChatOpenAI:
+    def _create_llm_client(cls, response_format) -> ChatOpenAI:
         try:
             api_key = cls._require_env("OPENAI_API_KEY")
             base_url = cls._require_env("OPENAI_API_BASE")

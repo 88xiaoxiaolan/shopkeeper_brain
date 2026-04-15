@@ -194,7 +194,7 @@ class AnswerOutputNode(BaseNode):
         # chunk并不是一个，而是分词的一个词
         try:
             for chunk in llm_client.stream(prompt):
-                delta = getattr(chunk,"delta","") or ""
+                delta = getattr(chunk,"content","") or ""
 
                 # 把增量放到sse队列中
                 push_sse_event(task_id=task_id, event=SSEEvent.DELTA, data={"delta": delta})

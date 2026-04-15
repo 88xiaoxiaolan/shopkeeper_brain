@@ -31,7 +31,13 @@ _NODE_NAME_TO_CN: Dict[str, str] = {
     "embedding_chunk_node": "向量生成",
     "import_milvus_node": "导入向量数据库",
     "__end__": "处理完成",
-
+    "item_name_confirmed_node": "商品名确认",
+    "hybrid_vector_search_node": "混合检索",
+    "hyde_vector_search_node": "假设文档搜索",
+    "web_mcp_search_node":"mcp联网搜索",
+    "rrf_merge_node": "rrf融合",
+    "reranker_node":"重排序",
+    "answer_output_node": "答案生成",
 }
 
 
